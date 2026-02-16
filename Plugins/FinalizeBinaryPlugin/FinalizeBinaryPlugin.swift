@@ -43,16 +43,16 @@ struct FinalizeBinaryPlugin: CommandPlugin {
         guard let picoSDKURL = context.package.dependencies.first(where: { $0.package.displayName == "CPicoSDK" })?.package.directoryURL else {
             fatalError("[CPicoSDK] Couldn't find CPicoSDK in the dependencies.")
         }
-        
+
         let matchingProducts = context.package.products(ofType: LibraryProduct.self)
         guard let libProduct = matchingProducts.first(where: { $0.name == productName }) else {
             fatalError("[CPicoSDK] Couldn't find a viable static library Product, name couldn't be matched. Given: \(productName); Found: [\(matchingProducts.map(\.name).joined(separator: ","))]")
         }
-        
+
         guard libProduct.kind == .static else {
             fatalError("[CPicoSDK] Only static libraries are supported.")
         }
-        
+
         // TODO: Figure out how to expand this.
         guard libProduct.sourceModules.count == 1 else {
             fatalError("[CPicoSDK] Only libraries with one target are supported.")
@@ -88,10 +88,16 @@ struct FinalizeBinaryPlugin: CommandPlugin {
 
         let standardOutput = Pipe()
         nmProcess.standardOutput = standardOutput
+        nmProcess.standardError = FileHandle.nullDevice
 
-        guard try await nmProcess.asyncRun() == 0 else { throw Error.nmFailed }
-
+        // Read pipe data before waiting for termination to avoid deadlock
+        // when nm output exceeds the pipe buffer size (~64KB).
+        try nmProcess.run()
+        // Close the parent's write end so readDataToEndOfFile sees EOF when nm exits.
+        try standardOutput.fileHandleForWriting.close()
         let outputData = standardOutput.fileHandleForReading.readDataToEndOfFile()
+        nmProcess.waitUntilExit()
+        guard nmProcess.terminationStatus == 0 else { throw Error.nmFailed }
         guard let outputString = String(data: outputData, encoding: .utf8) else {
             throw Error.nmFailed
         }
@@ -150,10 +156,16 @@ struct FinalizeBinaryPlugin: CommandPlugin {
 
         let standardOutput = Pipe()
         nmProcess.standardOutput = standardOutput
+        nmProcess.standardError = FileHandle.nullDevice
 
-        guard try await nmProcess.asyncRun() == 0 else { throw Error.nmFailed }
-
+        // Read pipe data before waiting for termination to avoid deadlock
+        // when nm output exceeds the pipe buffer size (~64KB).
+        try nmProcess.run()
+        // Close the parent's write end so readDataToEndOfFile sees EOF when nm exits.
+        try standardOutput.fileHandleForWriting.close()
         let outputData = standardOutput.fileHandleForReading.readDataToEndOfFile()
+        nmProcess.waitUntilExit()
+        guard nmProcess.terminationStatus == 0 else { throw Error.nmFailed }
         guard let outputString = String(data: outputData, encoding: .utf8) else {
             throw Error.nmFailed
         }
