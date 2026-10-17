@@ -54,7 +54,7 @@ struct GenerateCPicoSDKPlugin: CommandPlugin {
 
     /// `--combination <name>` (repeatable) regenerates only those headers; without it, all of them.
     /// Package.swift is always regenerated from every combination in env.json.
-    func requestedCombinations(arguments: [String], env: Env) throws -> Set<String> {
+    func requestedCombinations(arguments: [String], env: Env) throws(Error) -> Set<String> {
         var extractor = ArgumentExtractor(arguments)
         let requested = extractor.extractOption(named: "combination")
 
@@ -63,7 +63,7 @@ struct GenerateCPicoSDKPlugin: CommandPlugin {
         }
 
         for combination in requested where env.combinations[combination] == nil {
-            throw Error.unknownCombination(combination)
+            throw .unknownCombination(combination)
         }
 
         return Set(requested)
