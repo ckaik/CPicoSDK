@@ -1031,6 +1031,18 @@ compile, and link without programming hardware. Add `--memory-map-report` to
 print the memory report for each finalized test ELF. Full device runs require a
 connected target and will program and reset it.
 
+`--target` picks the board. It defaults to `rp2350`:
+
+| `--target` | Board | Default radio | Concurrency tests |
+|------------|-------|---------------|-------------------|
+| `rp2350` (alias `pico2`) | `pico2` | `Radio_None` | Run |
+| `rp2040` (alias `pico`) | `pico` | `Radio_None` | Skipped |
+| `pico2_w` | `pico2_w` | `Radio_CYW43439` | Run |
+| `pico_w` | `pico_w` | `Radio_CYW43439` | Skipped |
+
+A test's `traits.add` entry with a `Platform_`, `Variant_` or `Radio_` trait
+replaces the target's default for that axis.
+
 The harness reuses a generated SwiftPM package per target in the plugin work
 directory and builds it against the local CPicoSDK checkout. In remote mode it
 first stages all selected firmware, uploads each unique ELF, and submits one

@@ -163,7 +163,7 @@ struct Options {
     }
 
     static let help = """
-    Usage: swift package test-in-device [--remote|--execution remote|local] [--target rp2350|rp2040] [--build-type Debug|Release|RelWithDebInfo|MinSizeRel] [--filter NAME] [--list] [--build-only] [--passes N] [--adapter-speed HZ] [--memory-map-report]
+    Usage: swift package test-in-device [--remote|--execution remote|local] [--target rp2350|rp2040|pico2_w|pico_w] [--build-type Debug|Release|RelWithDebInfo|MinSizeRel] [--filter NAME] [--list] [--build-only] [--passes N] [--adapter-speed HZ] [--memory-map-report]
 
     Tests are discovered under Tests/Device/**/*.swift. Each file must start with a //% metadata block.
     Execution defaults to the directly connected device through local OpenOCD.

@@ -77,7 +77,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [rp2350, rp2040]
+        target: [rp2350, rp2040, pico2_w, pico_w]
         build_type: [Debug, Release, RelWithDebInfo, MinSizeRel]
     steps:
       - uses: actions/checkout@v5

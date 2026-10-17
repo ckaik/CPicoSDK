@@ -156,6 +156,8 @@ public struct TraitSelection: Equatable {
 public enum DeviceTestTarget: String, CaseIterable, Equatable {
     case rp2040
     case rp2350
+    case picoW = "pico_w"
+    case pico2W = "pico2_w"
 
     public static let boardDefiningTraitPrefixes = [
         "Platform_",
@@ -169,9 +171,13 @@ public enum DeviceTestTarget: String, CaseIterable, Equatable {
             self = .rp2040
         case "rp2350", "pico2":
             self = .rp2350
+        case "pico_w":
+            self = .picoW
+        case "pico2_w":
+            self = .pico2W
         default:
             throw DeviceTestHarnessError.invalidMetadata(
-                "unknown device target '\(argument)'; expected rp2040 or rp2350"
+                "unknown device target '\(argument)'; expected rp2040, rp2350, pico_w or pico2_w"
             )
         }
     }
@@ -182,41 +188,45 @@ public enum DeviceTestTarget: String, CaseIterable, Equatable {
             return "pico"
         case .rp2350:
             return "pico2"
+        case .picoW:
+            return "pico_w"
+        case .pico2W:
+            return "pico2_w"
         }
     }
 
     public var openOCDTargetConfig: String {
         switch self {
-        case .rp2040:
+        case .rp2040, .picoW:
             return "target/rp2040.cfg"
-        case .rp2350:
+        case .rp2350, .pico2W:
             return "target/rp2350.cfg"
         }
     }
 
     public var rttMemorySize: UInt32 {
         switch self {
-        case .rp2040:
+        case .rp2040, .picoW:
             return 0x40000
-        case .rp2350:
+        case .rp2350, .pico2W:
             return 0x80000
         }
     }
 
     public var swiftPMTriple: String {
         switch self {
-        case .rp2040:
+        case .rp2040, .picoW:
             return "armv6m-none-none-eabi"
-        case .rp2350:
+        case .rp2350, .pico2W:
             return "armv7em-none-none-eabi"
         }
     }
 
     public var supportsConcurrency: Bool {
         switch self {
-        case .rp2040:
+        case .rp2040, .picoW:
             return false
-        case .rp2350:
+        case .rp2350, .pico2W:
             return true
         }
     }
@@ -231,6 +241,14 @@ public enum DeviceTestTarget: String, CaseIterable, Equatable {
                 "Variant_RP2040",
                 "Radio_None",
             ]
+        case .picoW:
+            return [
+                "BootStage2_W25Q080",
+                "StdIO_RTT",
+                "Platform_RP2040",
+                "Variant_RP2040",
+                "Radio_CYW43439",
+            ]
         case .rp2350:
             return [
                 "BootStage2_W25Q080",
@@ -238,6 +256,14 @@ public enum DeviceTestTarget: String, CaseIterable, Equatable {
                 "Platform_RP2350",
                 "Variant_RP2350A",
                 "Radio_None",
+            ]
+        case .pico2W:
+            return [
+                "BootStage2_W25Q080",
+                "StdIO_RTT",
+                "Platform_RP2350",
+                "Variant_RP2350A",
+                "Radio_CYW43439",
             ]
         }
     }
