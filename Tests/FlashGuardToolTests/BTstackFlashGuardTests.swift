@@ -78,7 +78,7 @@ import Testing
     }
 
     @Test func `a file that isn't ELF32 is an error`() {
-        #expect(throws: ELFImage.ParseError.notELF32LittleEndian) {
+        #expect(throws: BTstackFlashGuard.Error.unreadableELF(.notELF32LittleEndian)) {
             try BTstackFlashGuard.inspect(elf: Data("not an elf".utf8))
         }
     }

@@ -8,15 +8,23 @@ import Foundation
 /// erases and writes at runtime: the last 2 sectors on RP2040, and the last 3 on RP2350 with A2
 /// support (the 8 KB bank plus the RP2350-E10 erratum sector).
 enum BTstackFlashGuard {
+    /// Why an image can't be checked.
     enum Error: Swift.Error, Equatable, CustomStringConvertible {
+        /// The file isn't an ELF the guard can read.
+        case unreadableELF(ELFImage.ParseError)
         /// The image uses BTstack's flash bank, but the harness didn't publish where it is. Accepting
         /// it would let a BLE image through unchecked.
         case missingReservedRegion
 
         var description: String {
-            "the image links BTstack's flash bank (\(BTstackFlashGuard.flashBankSymbol)), but not the "
-                + "\(BTstackFlashGuard.reservedStartSymbol) / \(BTstackFlashGuard.reservedEndSymbol) symbols "
-                + "from the finalize harness's btstack_flash_guard.c, so the image can't be checked"
+            switch self {
+            case .unreadableELF(let error):
+                "\(error)"
+            case .missingReservedRegion:
+                "the image links BTstack's flash bank (\(BTstackFlashGuard.flashBankSymbol)), but not the "
+                    + "\(BTstackFlashGuard.reservedStartSymbol) / \(BTstackFlashGuard.reservedEndSymbol) "
+                    + "symbols from the finalize harness's btstack_flash_guard.c, so the image can't be checked"
+            }
         }
     }
 
@@ -31,13 +39,18 @@ enum BTstackFlashGuard {
     static let reservedEndSymbol = "__cpicosdk_btstack_flash_reserved_end"
     static let flashBankSymbol = "pico_flash_bank_instance"
 
-    static func inspect(elf: Data) throws -> Verdict {
-        let image = try ELFImage(elf)
+    static func inspect(elf: Data) throws(Error) -> Verdict {
+        let image: ELFImage
+        do {
+            image = try ELFImage(elf)
+        } catch {
+            throw .unreadableELF(error)
+        }
 
         guard let reservedStart = image.symbols[reservedStartSymbol],
               let reservedEnd = image.symbols[reservedEndSymbol]
         else {
-            guard image.symbols[flashBankSymbol] == nil else { throw Error.missingReservedRegion }
+            guard image.symbols[flashBankSymbol] == nil else { throw .missingReservedRegion }
 
             return .noReservedRegion
         }

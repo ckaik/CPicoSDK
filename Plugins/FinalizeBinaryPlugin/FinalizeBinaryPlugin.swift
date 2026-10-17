@@ -348,9 +348,7 @@ struct FinalizeBinaryPlugin: CommandPlugin {
         guard try await cmakeBuildProcess.asyncRun() == 0 else { throw Error.cmakeBuildFailed }
 
         // Drop the previous build's outputs first, so a rejected image can't leave a stale one to flash.
-        for artifactExtension in ["elf", "uf2"] {
-            try? fileManager.removeItem(at: outputDir.appending(path: "\(productName).\(artifactExtension)"))
-        }
+        removeArtifacts(["elf", "uf2"], of: productName, in: outputDir)
 
         try await checkBTstackFlashRegion(flashGuardTool: flashGuardTool, buildDir: buildDir, productName: productName)
 
@@ -388,26 +386,48 @@ struct FinalizeBinaryPlugin: CommandPlugin {
     /// Rejects a BLE image that reaches BTstack's reserved flash bank (spec §11.6). The CMake build
     /// has already written the ELF, UF2, BIN and HEX into `buildDir` by now, so a rejection removes
     /// them before failing: nothing flashable survives a rejected build.
-    private func checkBTstackFlashRegion(flashGuardTool: URL, buildDir: URL, productName: String) async throws {
+    private func checkBTstackFlashRegion(flashGuardTool: URL, buildDir: URL, productName: String) async throws(Error) {
         let guardProcess = Process()
         guardProcess.executableURL = flashGuardTool
         guardProcess.arguments = [buildDir.appending(path: "\(productName).elf").path]
 
-        let (status, _, errorData) = try await guardProcess.asyncRun(captureStdout: false, captureStderr: true)
-        guard status != 0 else { return }
-
-        for artifactExtension in ["elf", "uf2", "bin", "hex"] {
-            try? FileManager.default.removeItem(at: buildDir.appending(path: "\(productName).\(artifactExtension)"))
+        let exitStatus: Int32
+        let errorData: Data?
+        do {
+            (exitStatus, _, errorData) = try await guardProcess.asyncRun(captureStdout: false, captureStderr: true)
+        } catch {
+            removeArtifacts(["elf", "uf2", "bin", "hex"], of: productName, in: buildDir)
+            throw .flashGuardFailed("FlashGuardTool couldn't run: \(error)")
         }
+
+        let status = FlashGuardStatus(rawValue: exitStatus)
+        guard status != .accepted else { return }
+
+        removeArtifacts(["elf", "uf2", "bin", "hex"], of: productName, in: buildDir)
 
         let reason = errorData
             .flatMap { String(data: $0, encoding: .utf8) }?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .nonEmpty ?? "FlashGuardTool exited with status \(status)"
+            .nonEmpty ?? "FlashGuardTool exited with status \(exitStatus)"
         print("[CPicoSDK] error: \(reason)")
         print("[CPicoSDK] No ELF or UF2 was written for \(productName).")
 
-        throw status == 1 ? Error.btstackFlashRegionReached(reason) : Error.flashGuardFailed(reason)
+        throw status == .rejected ? Error.btstackFlashRegionReached(reason) : Error.flashGuardFailed(reason)
+    }
+
+    /// Removes the build outputs of `productName` with these extensions from `directory`, where they exist.
+    private func removeArtifacts(_ extensions: [String], of productName: String, in directory: URL) {
+        for artifactExtension in extensions {
+            try? FileManager.default.removeItem(at: directory.appending(path: "\(productName).\(artifactExtension)"))
+        }
+    }
+
+    /// FlashGuardTool's exit status. It mirrors the tool's `ExitStatus`, because a plugin can't import an
+    /// executable target.
+    private enum FlashGuardStatus: Int32 {
+        case accepted = 0
+        case rejected = 1
+        case uncheckable = 2
     }
 
     private func makeEmbeddedResourceCMakeArguments(_ embeddedResources: [String: URL]) throws -> [String] {
