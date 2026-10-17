@@ -173,6 +173,12 @@ if("pico_btstack_ble" IN_LIST IMPORTED_LIBS_LIST AND "pico_stdio_rtt" IN_LIST IM
     set_target_properties(pico_btstack_base PROPERTIES INTERFACE_SOURCES "${CPICOSDK_BTSTACK_BASE_SOURCES}")
 endif()
 
+# BLE images publish BTstack's effective flash bank placement, which FinalizeBinaryPlugin checks the
+# image against before writing anything flashable. Other images don't reserve any flash.
+if("pico_btstack_ble" IN_LIST IMPORTED_LIBS_LIST)
+    target_sources("${PROJECT_NAME}" PRIVATE ${CMAKE_CURRENT_LIST_DIR}/btstack_flash_guard.c)
+endif()
+
 # Add the standard include files to the build
 target_include_directories("${PROJECT_NAME}" PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}

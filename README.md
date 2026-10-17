@@ -295,6 +295,12 @@ both CMake harnesses), so apps can't change pool sizes or features. The Pimoroni
 trait union, is a compile error. When `Radio_CYW43439_BLE` is on, CPicoSDK also depends on the
 declaration-free `_CPicoSDK_BLE` module, so a dependent package can check `canImport(_CPicoSDK_BLE)`.
 
+BLE builds reserve the end of flash for BTstack's bond storage, at pico-sdk's default offset: the
+last 2 sectors on a Pico W, and the last 3 on a Pico 2 W (the 8 KB bank, then the RP2350-E10
+erratum sector). `cyw43_arch_init()` writes there on first boot, even without pairing. Finalizing
+fails, and writes no ELF or UF2, when an image's flash load extent (code, read-only data and
+initialised data) reaches that region. Keep any other flash storage out of it too.
+
 ### Features & Capabilities
 
 - **Full Pico SDK Access**: Interact with hardware peripherals (GPIO, ADC, I2C, SPI, UART, PWM, DMA, etc.) directly from Swift
@@ -723,6 +729,8 @@ artifacts:
 - Embeds `.codeasset` resources by passing generated name/path lists into the CMake harness
 - Runs as a native Swift plugin (no standalone shell build script)
 - Includes `shims.c` for runtime compatibility
+- Rejects a BLE image that reaches BTstack's reserved flash, before writing any ELF or UF2
+  (`FlashGuardTool` checks the ELF against the region that `btstack_flash_guard.c` publishes)
 - Generates both ELF (for debugging) and UF2 (for flashing) binaries
 - Prints final artifact file sizes, including the raw `.bin` flash payload, UF2
   transfer file size, and host ELF debug file size

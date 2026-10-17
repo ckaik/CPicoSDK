@@ -3,7 +3,7 @@ import PackagePlugin
 
 @main
 struct FinalizeBinaryPlugin: CommandPlugin {
-    enum Error: Swift.Error {
+    enum Error: Swift.Error, CustomStringConvertible {
         case nmFailed
         case swiftlyResolutionFailed
         case rsyncFailed
@@ -14,6 +14,8 @@ struct FinalizeBinaryPlugin: CommandPlugin {
         case invalidEmbeddedResourceName(String)
         case invalidEmbeddedResourcePath(String, URL)
         case duplicateEmbeddedResourceName(String)
+        case btstackFlashRegionReached(String)
+        case flashGuardFailed(String)
 
         var localizedDescription: String {
             switch self {
@@ -37,8 +39,15 @@ struct FinalizeBinaryPlugin: CommandPlugin {
                 return "Embedded resource '\(name)' must use an absolute file URL without CMake list separators, got: \(url)"
             case .duplicateEmbeddedResourceName(let name):
                 return "Multiple embedded resources would be staged as '\(name)'"
+            case .btstackFlashRegionReached(let reason):
+                return reason
+            case .flashGuardFailed(let reason):
+                return reason
             }
         }
+
+        // SwiftPM prints a failed command's error with `description`.
+        var description: String { localizedDescription }
     }
 
     func performCommand(context: PackagePlugin.PluginContext, arguments: [String]) async throws {
@@ -51,6 +60,7 @@ struct FinalizeBinaryPlugin: CommandPlugin {
 
         let incremental = arguments.contains("--incremental")
         let memoryMapTool = try context.tool(named: "MemoryMapReportTool")
+        let flashGuardTool = try context.tool(named: "FlashGuardTool")
         guard let picoSDKURL = context.package.dependencies.first(where: { $0.package.displayName == "CPicoSDK" })?.package.directoryURL else {
             fatalError("[CPicoSDK] Couldn't find CPicoSDK in the dependencies.")
         }
@@ -95,6 +105,7 @@ struct FinalizeBinaryPlugin: CommandPlugin {
             packageDir: context.package.directoryURL,
             cpicoSDKPath: picoSDKURL,
             memoryMapTool: memoryMapTool.url,
+            flashGuardTool: flashGuardTool.url,
             swiftBuildType: swiftBuildType,
             clean: !incremental
         )
@@ -268,7 +279,7 @@ struct FinalizeBinaryPlugin: CommandPlugin {
             .path
     }
 
-    func runBuild(combination: String, stdioOptions: (uart: Bool, usb: Bool, rtt: Bool), extraSwiftArchives: [String], workingDir: URL, cmakeHarness: URL, outputDir: URL, buildArtifact: URL, productName: String, embeddedResources: [String: URL], packageDir: URL, cpicoSDKPath: URL, memoryMapTool: URL, swiftBuildType: String, clean: Bool) async throws {
+    func runBuild(combination: String, stdioOptions: (uart: Bool, usb: Bool, rtt: Bool), extraSwiftArchives: [String], workingDir: URL, cmakeHarness: URL, outputDir: URL, buildArtifact: URL, productName: String, embeddedResources: [String: URL], packageDir: URL, cpicoSDKPath: URL, memoryMapTool: URL, flashGuardTool: URL, swiftBuildType: String, clean: Bool) async throws {
         let fileManager = FileManager.default
         let cmakePath = try Env.value("CMAKE_PATH", combination: combination).expected
         let cmakeBin = URL(filePath: cmakePath, directoryHint: .notDirectory).appending(path: "cmake")
@@ -336,18 +347,23 @@ struct FinalizeBinaryPlugin: CommandPlugin {
         cmakeBuildProcess.arguments = ["--build", buildDir.path]
         guard try await cmakeBuildProcess.asyncRun() == 0 else { throw Error.cmakeBuildFailed }
 
+        // Drop the previous build's outputs first, so a rejected image can't leave a stale one to flash.
+        for artifactExtension in ["elf", "uf2"] {
+            try? fileManager.removeItem(at: outputDir.appending(path: "\(productName).\(artifactExtension)"))
+        }
+
+        try await checkBTstackFlashRegion(flashGuardTool: flashGuardTool, buildDir: buildDir, productName: productName)
+
         try fileManager.ensureDirectoryExists(at: outputDir.path, isDirectory: true)
 
         print("[CPicoSDK] Output directory prepared at \(outputDir.path)")
 
-        try? fileManager.removeItem(at: outputDir.appending(path: "\(productName).elf"))
         try fileManager.copyItem(
             at: buildDir.appending(path: "\(productName).elf"),
             to: outputDir.appending(path: "\(productName).elf")
         )
         print("[CPicoSDK] Copying \(buildDir.appending(path: "\(productName).elf").path) to \(outputDir.appending(path: "\(productName).elf").path)")
 
-        try? fileManager.removeItem(at: outputDir.appending(path: "\(productName).uf2"))
         try fileManager.copyItem(
             at: buildDir.appending(path: "\(productName).uf2"),
             to: outputDir.appending(path: "\(productName).uf2")
@@ -367,6 +383,31 @@ struct FinalizeBinaryPlugin: CommandPlugin {
         )
 
         print("[CPicoSDK] 🎉 Build completed successfully! 🎉")
+    }
+
+    /// Rejects a BLE image that reaches BTstack's reserved flash bank (spec §11.6). The CMake build
+    /// has already written the ELF, UF2, BIN and HEX into `buildDir` by now, so a rejection removes
+    /// them before failing: nothing flashable survives a rejected build.
+    private func checkBTstackFlashRegion(flashGuardTool: URL, buildDir: URL, productName: String) async throws {
+        let guardProcess = Process()
+        guardProcess.executableURL = flashGuardTool
+        guardProcess.arguments = [buildDir.appending(path: "\(productName).elf").path]
+
+        let (status, _, errorData) = try await guardProcess.asyncRun(captureStdout: false, captureStderr: true)
+        guard status != 0 else { return }
+
+        for artifactExtension in ["elf", "uf2", "bin", "hex"] {
+            try? FileManager.default.removeItem(at: buildDir.appending(path: "\(productName).\(artifactExtension)"))
+        }
+
+        let reason = errorData
+            .flatMap { String(data: $0, encoding: .utf8) }?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nonEmpty ?? "FlashGuardTool exited with status \(status)"
+        print("[CPicoSDK] error: \(reason)")
+        print("[CPicoSDK] No ELF or UF2 was written for \(productName).")
+
+        throw status == 1 ? Error.btstackFlashRegionReached(reason) : Error.flashGuardFailed(reason)
     }
 
     private func makeEmbeddedResourceCMakeArguments(_ embeddedResources: [String: URL]) throws -> [String] {
