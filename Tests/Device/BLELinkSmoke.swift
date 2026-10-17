@@ -14,6 +14,11 @@
 
 import CPicoSDK
 
+// The marker module comes with Radio_CYW43439_BLE, which is how PicoBluetooth gates itself.
+#if !canImport(_CPicoSDK_BLE)
+    #error("Radio_CYW43439_BLE didn't make _CPicoSDK_BLE importable.")
+#endif
+
 /// Goal: a Radio_CYW43439_BLE build links the CYW43 arch in poll mode together with the BTstack LE
 /// host (HCI, L2CAP, SM, ATT server and its runtime DB, GATT client, the TLV device DB) and the
 /// CYW43 HCI transport. On a board, `cyw43_arch_init()` also starts BTstack, and after
