@@ -30,11 +30,23 @@
     #endif
 #endif
 
+// Trait union can enable two radios at once. The combination chain below would then silently pick
+// whichever arm comes first, so reject it here.
+#if (Radio_None && (Radio_CYW43439 || Radio_CYW43439_BLE)) || (Radio_CYW43439 && Radio_CYW43439_BLE)
+    #error("Only one Radio can be selected at a time: Radio_None, Radio_CYW43439 or Radio_CYW43439_BLE.")
+#endif
+
+// BLE combinations come before their Wi-Fi-only twins.
 #if Platform_RP2040 && Variant_RP2040 && Radio_None
     @_cdecl("_cpicosdk_combination_pico")
     func cpicosdk_combination_pico_marker() {}
 
     @_exported import _CPicoSDK_pico
+#elseif Platform_RP2040 && Variant_RP2040 && Radio_CYW43439_BLE
+    @_cdecl("_cpicosdk_combination_pico_w_ble")
+    func cpicosdk_combination_pico_w_ble_marker() {}
+
+    @_exported import _CPicoSDK_pico_w_ble
 #elseif Platform_RP2040 && Variant_RP2040 && Radio_CYW43439
     @_cdecl("_cpicosdk_combination_pico_w")
     func cpicosdk_combination_pico_w_marker() {}
@@ -45,6 +57,11 @@
     func cpicosdk_combination_pico2_marker() {}
 
     @_exported import _CPicoSDK_pico2
+#elseif Variant_RP2350A && Radio_CYW43439_BLE
+    @_cdecl("_cpicosdk_combination_pico2_w_ble")
+    func cpicosdk_combination_pico2_w_ble_marker() {}
+
+    @_exported import _CPicoSDK_pico2_w_ble
 #elseif Variant_RP2350A && Radio_CYW43439
     @_cdecl("_cpicosdk_combination_pico2_w")
     func cpicosdk_combination_pico2_w_marker() {}

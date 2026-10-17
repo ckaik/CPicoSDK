@@ -164,6 +164,15 @@ target_link_libraries("${PROJECT_NAME}" ${IMPORTED_LIBS_LIST})
 target_link_libraries("${PROJECT_NAME}" "-Wl,--end-group")
 target_link_libraries("${PROJECT_NAME}" pico_async_context_poll)
 
+# BTstack compiles its own copy of SEGGER_RTT.c unless the target enables RTT stdio, but
+# IMPORTED_LIBS always links pico_stdio_rtt, which compiles the Pico SDK's copy. Keep only the
+# latter so BLE builds don't fail with duplicate SEGGER_RTT_* symbols.
+if("pico_btstack_ble" IN_LIST IMPORTED_LIBS_LIST AND "pico_stdio_rtt" IN_LIST IMPORTED_LIBS_LIST)
+    get_target_property(CPICOSDK_BTSTACK_BASE_SOURCES pico_btstack_base INTERFACE_SOURCES)
+    list(FILTER CPICOSDK_BTSTACK_BASE_SOURCES EXCLUDE REGEX "segger-rtt/SEGGER_RTT\\.c")
+    set_target_properties(pico_btstack_base PROPERTIES INTERFACE_SOURCES "${CPICOSDK_BTSTACK_BASE_SOURCES}")
+endif()
+
 # Add the standard include files to the build
 target_include_directories("${PROJECT_NAME}" PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}

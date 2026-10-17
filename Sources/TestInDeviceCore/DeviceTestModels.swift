@@ -195,6 +195,36 @@ public enum DeviceTestTarget: String, CaseIterable, Equatable {
         }
     }
 
+    /// The CPicoSDK combination (`BOARD`) a test with these resolved traits builds against.
+    /// `Radio_CYW43439_BLE` selects the board's `_ble` combination, which shares its Pico SDK board.
+    public func board(forTraits traits: [String]) -> String {
+        traits.contains(Self.bleRadioTrait) ? "\(board)_ble" : board
+    }
+
+    public var hasCYW43439Radio: Bool {
+        switch self {
+        case .rp2040, .rp2350:
+            return false
+        case .picoW, .pico2W:
+            return true
+        }
+    }
+
+    /// Why this target can't run the test, or `nil` when it can.
+    public func skipReason(for metadata: DeviceTestMetadata) -> String? {
+        if metadata.concurrency && !supportsConcurrency {
+            return "target \(rawValue) does not support concurrency"
+        }
+
+        if metadata.traits.add.contains(Self.bleRadioTrait) && !hasCYW43439Radio {
+            return "target \(rawValue) has no CYW43439 radio for \(Self.bleRadioTrait)"
+        }
+
+        return nil
+    }
+
+    static let bleRadioTrait = "Radio_CYW43439_BLE"
+
     public var openOCDTargetConfig: String {
         switch self {
         case .rp2040, .picoW:
@@ -331,12 +361,15 @@ public struct GeneratedPackage: Equatable {
     public var packageDirectory: URL
     public var elfURL: URL
     public var productName: String
+    /// The CPicoSDK combination the package builds against; exported as `BOARD`.
+    public var board: String
     public var inputsChanged: Bool
 
-    public init(packageDirectory: URL, elfURL: URL, productName: String, inputsChanged: Bool = true) {
+    public init(packageDirectory: URL, elfURL: URL, productName: String, board: String, inputsChanged: Bool = true) {
         self.packageDirectory = packageDirectory
         self.elfURL = elfURL
         self.productName = productName
+        self.board = board
         self.inputsChanged = inputsChanged
     }
 }

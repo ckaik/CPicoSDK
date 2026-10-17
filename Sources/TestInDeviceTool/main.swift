@@ -252,8 +252,8 @@ struct DeviceHarnessRunner {
         for (index, test) in tests.enumerated() {
             let startedAt = Date()
             logPartial("[test-in-device] \(index + 1)/\(tests.count) \(terminalBoldYellow(test.metadata.name))")
-            if test.metadata.concurrency && !options.target.supportsConcurrency {
-                logLine(" SKIP: target \(options.target.rawValue) does not support concurrency")
+            if let skipReason = options.target.skipReason(for: test.metadata) {
+                logLine(" SKIP: \(skipReason)")
                 continue
             }
             do {
@@ -334,8 +334,8 @@ struct DeviceHarnessRunner {
                 "[test-in-device] \(index + 1)/\(tests.count) "
                     + terminalBoldYellow(test.metadata.name)
             )
-            if test.metadata.concurrency && !options.target.supportsConcurrency {
-                logLine(" SKIP: target \(options.target.rawValue) does not support concurrency")
+            if let skipReason = options.target.skipReason(for: test.metadata) {
+                logLine(" SKIP: \(skipReason)")
                 continue
             }
             do {
@@ -680,7 +680,7 @@ struct DeviceHarnessRunner {
         set -euo pipefail
         cd \(shellQuote(generated.packageDirectory.path))
         export BUILD_TYPE="\(buildType.rawValue)"
-        export BOARD="\(options.target.board)"
+        export BOARD="\(generated.board)"
         export CPICOSDK_CORE0_STACK_SIZE_BYTES="${CPICOSDK_CORE0_STACK_SIZE_BYTES:-8192}"
         export CPICOSDK_CORE1_STACK_SIZE_BYTES="${CPICOSDK_CORE1_STACK_SIZE_BYTES:-8192}"
         export BUILD_SCRIPT_VERSION=1

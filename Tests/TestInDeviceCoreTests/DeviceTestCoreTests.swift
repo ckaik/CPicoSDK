@@ -195,6 +195,56 @@ import Testing
     #expect(args.contains(#"rtt setup 0x20000000 0x80000 "SEGGER RTT""#))
 }
 
+@Test func selectsBLECombinationBoardWhenTestAddsBLERadioOnWTargets() throws {
+    let ble = TraitSelection(add: ["Radio_CYW43439_BLE"])
+
+    let picoW = DeviceTestTarget.picoW
+    #expect(picoW.board(forTraits: ble.resolvedTraits(defaultTraits: picoW.defaultTraits)) == "pico_w_ble")
+    #expect(picoW.board(forTraits: picoW.defaultTraits) == "pico_w")
+
+    let pico2W = DeviceTestTarget.pico2W
+    #expect(pico2W.board(forTraits: ble.resolvedTraits(defaultTraits: pico2W.defaultTraits)) == "pico2_w_ble")
+    #expect(pico2W.board(forTraits: pico2W.defaultTraits) == "pico2_w")
+}
+
+@Test func skipsBLETestsOnTargetsWithoutCYW43439Radio() throws {
+    let metadata = DeviceTestMetadata(
+        name: "BLE",
+        traits: TraitSelection(add: ["Radio_CYW43439_BLE"])
+    )
+
+    #expect(DeviceTestTarget.rp2040.skipReason(for: metadata) != nil)
+    #expect(DeviceTestTarget.rp2350.skipReason(for: metadata) != nil)
+    #expect(DeviceTestTarget.picoW.skipReason(for: metadata) == nil)
+    #expect(DeviceTestTarget.pico2W.skipReason(for: metadata) == nil)
+    #expect(DeviceTestTarget.rp2350.skipReason(for: DeviceTestMetadata(name: "Plain")) == nil)
+}
+
+@Test func skipsConcurrencyTestsOnTargetsWithoutConcurrency() throws {
+    let metadata = DeviceTestMetadata(name: "Async", concurrency: true)
+
+    #expect(DeviceTestTarget.picoW.skipReason(for: metadata) != nil)
+    #expect(DeviceTestTarget.pico2W.skipReason(for: metadata) == nil)
+}
+
+@Test func generatesPackageWithBLERadioReplacingDefaultRadio() throws {
+    let metadata = DeviceTestMetadata(name: "BLE", traits: TraitSelection(add: ["Radio_CYW43439_BLE"]))
+    let source = DeviceTestSource(
+        fileURL: URL(fileURLWithPath: "/tmp/BLE.swift"),
+        source: "func bleTest() throws {}",
+        metadata: metadata,
+        functions: [DeviceTestFunction(name: "bleTest", isAsync: false, isThrowing: true)]
+    )
+
+    let manifest = DevicePackageGenerator.packageManifest(
+        for: source,
+        cpicoSDKPath: URL(fileURLWithPath: "/repo/CPicoSDK"),
+        target: .pico2W
+    )
+    #expect(manifest.contains(".init(name: \"Radio_CYW43439_BLE\")"))
+    #expect(!manifest.contains(".init(name: \"Radio_CYW43439\")"))
+}
+
 @Test func generatesPackageWithConcurrencyDependencyOnlyWhenRequested() throws {
     let metadata = DeviceTestMetadata(name: "Async", concurrency: true)
     let source = DeviceTestSource(

@@ -36,6 +36,7 @@ public enum DevicePackageGenerator {
             packageDirectory: packageDirectory,
             elfURL: elfURL,
             productName: productName,
+            board: target.board(forTraits: source.metadata.traits.resolvedTraits(defaultTraits: target.defaultTraits)),
             inputsChanged: manifestChanged || sourceChanged || runnerChanged
         )
     }

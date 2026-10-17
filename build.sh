@@ -10,7 +10,9 @@ echo "You don't need to run this script if you are using CPicoSDK as a Swift Pac
 
 # Cleaning up existing build artifacts.
 rm -rf .build
-rm -rf Package.swift Package.resolved Sources/_CPicoSDK*
+rm -rf Package.swift Package.resolved
+# Generated combination modules only: Sources/_CPicoSDK_BLE is a hand-written marker module.
+find Sources -maxdepth 1 -name '_CPicoSDK_*' ! -name '_CPicoSDK_BLE' -exec rm -rf {} +
 cp Package.swift.template Package.swift
 
 export PREPARATION_SCRIPT_PATH="$(dirname "$0")/.env_prep"

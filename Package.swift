@@ -42,6 +42,7 @@ let package = Package(
 
         .trait(name: "Radio_None"),
         .trait(name: "Radio_CYW43439"),
+        .trait(name: "Radio_CYW43439_BLE", description: "Wi-Fi and BLE on the CYW43439 (Pico W, Pico 2 W). Pick it instead of Radio_CYW43439. Links BTstack in poll mode next to lwIP."),
 
         .trait(name: "BootStage2_W25Q080"),
         .trait(name: "BootStage2_GENERIC_03H"),
@@ -75,7 +76,9 @@ let package = Package(
         .target(name: "_CPicoSDK_pico"),
         .target(name: "_CPicoSDK_pico2"),
         .target(name: "_CPicoSDK_pico2_w"),
+        .target(name: "_CPicoSDK_pico2_w_ble"),
         .target(name: "_CPicoSDK_pico_w"),
+        .target(name: "_CPicoSDK_pico_w_ble"),
         .target(name: "_CPicoSDK_pimoroni_pico_plus2_rp2350"),
         .target(name: "_CPicoSDK_pimoroni_pico_plus2_w_rp2350"),
 
@@ -85,12 +88,18 @@ let package = Package(
             dependencies: [
                 .target(name: "ARMClib"),
                 .target(name: "CShims"),
+                // Keep this above the generator mark: the generator appends the combination list
+                // below every mark. The condition names only the radio trait, so that
+                // `canImport(_CPicoSDK_BLE)` tracks Radio_CYW43439_BLE alone.
+                .target(name: "_CPicoSDK_BLE", condition: .when(traits: ["Radio_CYW43439_BLE"])),
 
                 // GENERATOR MARK: TARGET DEPENDENCIES
                 .target(name: "_CPicoSDK_pico", condition: .when(traits: ["Platform_RP2040", "Variant_RP2040", "Radio_None"])),
                 .target(name: "_CPicoSDK_pico2", condition: .when(traits: ["Variant_RP2350A", "Radio_None"])),
                 .target(name: "_CPicoSDK_pico2_w", condition: .when(traits: ["Variant_RP2350A", "Radio_CYW43439"])),
+                .target(name: "_CPicoSDK_pico2_w_ble", condition: .when(traits: ["Variant_RP2350A", "Radio_CYW43439_BLE"])),
                 .target(name: "_CPicoSDK_pico_w", condition: .when(traits: ["Platform_RP2040", "Variant_RP2040", "Radio_CYW43439"])),
+                .target(name: "_CPicoSDK_pico_w_ble", condition: .when(traits: ["Platform_RP2040", "Variant_RP2040", "Radio_CYW43439_BLE"])),
                 .target(name: "_CPicoSDK_pimoroni_pico_plus2_rp2350", condition: .when(traits: ["Variant_RP2350B", "Radio_None"])),
                 .target(name: "_CPicoSDK_pimoroni_pico_plus2_w_rp2350", condition: .when(traits: ["Variant_RP2350B", "Radio_CYW43439"])),
             ],
@@ -107,7 +116,9 @@ let package = Package(
                 .target(name: "_CPicoSDK_pico", condition: .when(traits: ["Platform_RP2040", "Variant_RP2040", "Radio_None"])),
                 .target(name: "_CPicoSDK_pico2", condition: .when(traits: ["Variant_RP2350A", "Radio_None"])),
                 .target(name: "_CPicoSDK_pico2_w", condition: .when(traits: ["Variant_RP2350A", "Radio_CYW43439"])),
+                .target(name: "_CPicoSDK_pico2_w_ble", condition: .when(traits: ["Variant_RP2350A", "Radio_CYW43439_BLE"])),
                 .target(name: "_CPicoSDK_pico_w", condition: .when(traits: ["Platform_RP2040", "Variant_RP2040", "Radio_CYW43439"])),
+                .target(name: "_CPicoSDK_pico_w_ble", condition: .when(traits: ["Platform_RP2040", "Variant_RP2040", "Radio_CYW43439_BLE"])),
                 .target(name: "_CPicoSDK_pimoroni_pico_plus2_rp2350", condition: .when(traits: ["Variant_RP2350B", "Radio_None"])),
                 .target(name: "_CPicoSDK_pimoroni_pico_plus2_w_rp2350", condition: .when(traits: ["Variant_RP2350B", "Radio_CYW43439"])),
             ],
@@ -121,11 +132,15 @@ let package = Package(
                 .define("Variant_RP2350B", .when(traits: ["Variant_RP2350B"])),
                 .define("Radio_None", .when(traits: ["Radio_None"])),
                 .define("Radio_CYW43439", .when(traits: ["Radio_CYW43439"])),
+                .define("Radio_CYW43439_BLE", .when(traits: ["Radio_CYW43439_BLE"])),
             ]
         ),
 
         // Manually defined targets
         .target(name: "ARMClib"),
+        // Declaration-free marker: its presence means the BLE radio was selected. Kept apart from
+        // the BTstack umbrella in `_CPicoSDK_*_ble` so dependents can gate on it.
+        .target(name: "_CPicoSDK_BLE"),
         .target(name: "TLSF"),
 
         .target(
@@ -167,7 +182,7 @@ let package = Package(
         .executableTarget(name: "pioasm-swift", path: "Sources/PIOASM/pioasm-swift"),
 
         .plugin(
-            name: "AssetCompiler", 
+            name: "AssetCompiler",
             capability: .buildTool,
             dependencies: ["AssetCompilerTool"]
         ),

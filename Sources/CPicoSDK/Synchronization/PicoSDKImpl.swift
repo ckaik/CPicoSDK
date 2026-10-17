@@ -1,9 +1,13 @@
 #if Platform_RP2040 && Variant_RP2040 && Radio_None
     import _CPicoSDK_pico
+#elseif Platform_RP2040 && Variant_RP2040 && Radio_CYW43439_BLE
+    import _CPicoSDK_pico_w_ble
 #elseif Platform_RP2040 && Variant_RP2040 && Radio_CYW43439
     import _CPicoSDK_pico_w
 #elseif Variant_RP2350A && Radio_None
     import _CPicoSDK_pico2
+#elseif Variant_RP2350A && Radio_CYW43439_BLE
+    import _CPicoSDK_pico2_w_ble
 #elseif Variant_RP2350A && Radio_CYW43439
     import _CPicoSDK_pico2_w
 #elseif Variant_RP2350B && Radio_None

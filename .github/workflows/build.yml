@@ -69,6 +69,9 @@ jobs:
       - name: Run host Swift tests
         run: |
           CPICOSDK_HOST_TESTS=1 swiftly run swift test
+      - name: Check both CMake harnesses share one btstack_config.h
+        run: |
+          cmp Plugins/GenerateCPicoSDKPluginTool/CMakeHarness/btstack_config.h Plugins/FinalizeBinaryPluginTool/CMakeHarness/btstack_config.h
 
   build-device-tests:
     name: Device Test Firmware Build (${{ matrix.target }}, ${{ matrix.build_type }})
@@ -95,6 +98,47 @@ jobs:
       - name: Build ${{ matrix.target }} ${{ matrix.build_type }} device test firmware
         run: |
           swiftly run swift package --disable-sandbox test-in-device --target "${{ matrix.target }}" --build-type "${{ matrix.build_type }}" --build-only --memory-map-report --allow-writing-to-package-directory --allow-network-connections all
+
+  # The matrix above already builds BLELinkSmoke for pico_w and pico2_w. This job pins the two BLE
+  # combinations explicitly and checks the linked map for the CYW43/BTstack entry points.
+  build-ble-link-smoke:
+    name: BLE Link Smoke (${{ matrix.target }})
+    needs: prepare-deps
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: pico_w
+            combination: pico_w_ble
+            triple: armv6m-none-none-eabi
+          - target: pico2_w
+            combination: pico2_w_ble
+            triple: armv7em-none-none-eabi
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pico-env
+      - name: Build BLELinkSmoke for ${{ matrix.combination }}
+        run: |
+          swiftly run swift package --disable-sandbox test-in-device --target "${{ matrix.target }}" --filter BLELinkSmoke --build-only --memory-map-report --allow-writing-to-package-directory --allow-network-connections all
+      - name: Check the map for CYW43 and BTstack entry points
+        run: |
+          set -euo pipefail
+          package=".build/plugins/TestInDevicePlugin/outputs/GeneratedDeviceTests/${{ matrix.target }}/Current"
+          elf="$package/.build/${{ matrix.triple }}/debug/DeviceTestApp.elf"
+          map="$package/.build/plugins/FinalizeBinaryPlugin/outputs/CMakeHarness/build_${{ matrix.combination }}/DeviceTestApp.elf.map"
+          nm="$PICO_SDK_BUNDLE_PATH/toolchain/$(jq -r '.vars.TOOLCHAIN_VERSION' env.json)/bin/arm-none-eabi-nm"
+          test -f "$map"
+          defined="$("$nm" --defined-only "$elf" | awk '{print $3}')"
+          for symbol in cyw43_arch_init cyw43_arch_poll btstack_cyw43_init cyw43_bluetooth_hci_init \
+                        hci_init hci_power_control hci_get_state l2cap_init sm_init att_server_init \
+                        att_db_util_init gatt_client_init le_device_db_tlv_configure \
+                        btstack_run_loop_async_context_get_instance lwip_init; do
+            grep -qx "$symbol" <<< "$defined" || { echo "missing $symbol"; exit 1; }
+          done
+          # The BT-capable Wi-Fi firmware and the BT patch replace the Wi-Fi-only blob.
+          grep -q wb43439A0_7_95_49_00_combined "$map"
+          grep -q cyw43_btfw_43439 "$map"
 
   build-example:
     name: Example Build
