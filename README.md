@@ -729,8 +729,12 @@ artifacts:
 - Embeds `.codeasset` resources by passing generated name/path lists into the CMake harness
 - Runs as a native Swift plugin (no standalone shell build script)
 - Includes `shims.c` for runtime compatibility
-- Rejects a BLE image that reaches BTstack's reserved flash, before writing any ELF or UF2
-  (`FlashGuardTool` checks the ELF against the region that `btstack_flash_guard.c` publishes)
+- Rejects a BLE image that reaches BTstack's reserved flash, before copying any ELF or UF2 to the
+  output directory (`FlashGuardTool` checks the ELF against the region that `btstack_flash_guard.c`
+  publishes). The check needs the linked ELF, and the CMake build writes the UF2, BIN and HEX in
+  the same step, so the guard can't run before they exist. Instead a rejection deletes all of
+  them from the CMake build directory, along with the previous build's ELF and UF2 in the output
+  directory: no flashable file survives a rejected build.
 - Generates both ELF (for debugging) and UF2 (for flashing) binaries
 - Prints final artifact file sizes, including the raw `.bin` flash payload, UF2
   transfer file size, and host ELF debug file size
