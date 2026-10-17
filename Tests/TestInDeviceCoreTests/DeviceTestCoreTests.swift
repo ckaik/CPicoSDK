@@ -147,6 +147,54 @@ import Testing
     #expect(DeviceTestTarget.rp2350.supportsConcurrency)
 }
 
+@Test func resolvesPicoWTargetWithCYW43439RadioAndRP2040Probe() throws {
+    let target = try DeviceTestTarget(argument: "pico_w")
+    let traits = TraitSelection(add: [], remove: []).resolvedTraits(defaultTraits: target.defaultTraits)
+    #expect(target.board == "pico_w")
+    #expect(target.swiftPMTriple == "armv6m-none-none-eabi")
+    #expect(!target.supportsConcurrency)
+    #expect(traits.contains("Platform_RP2040"))
+    #expect(traits.contains("Variant_RP2040"))
+    #expect(traits.contains("Radio_CYW43439"))
+    #expect(!traits.contains("Radio_None"))
+
+    let args = OpenOCDCommandBuilder.arguments(
+        paths: OpenOCDPaths(
+            executable: URL(fileURLWithPath: "/tools/openocd.exe"),
+            scriptsDirectory: URL(fileURLWithPath: "/tools/scripts"),
+            helpersScript: nil
+        ),
+        elfURL: URL(fileURLWithPath: "/tmp/DeviceTestApp.elf"),
+        target: target
+    )
+    #expect(args.contains("target/rp2040.cfg"))
+    #expect(args.contains(#"rtt setup 0x20000000 0x40000 "SEGGER RTT""#))
+}
+
+@Test func resolvesPico2WTargetWithCYW43439RadioAndRP2350Probe() throws {
+    let target = try DeviceTestTarget(argument: "pico2_w")
+    let traits = TraitSelection(add: [], remove: []).resolvedTraits(defaultTraits: target.defaultTraits)
+    #expect(target.board == "pico2_w")
+    #expect(target.swiftPMTriple == "armv7em-none-none-eabi")
+    #expect(target.supportsConcurrency)
+    #expect(traits.contains("Platform_RP2350"))
+    #expect(traits.contains("Variant_RP2350A"))
+    #expect(traits.contains("Radio_CYW43439"))
+    #expect(!traits.contains("Radio_None"))
+
+    let args = OpenOCDCommandBuilder.arguments(
+        paths: OpenOCDPaths(
+            executable: URL(fileURLWithPath: "/tools/openocd.exe"),
+            scriptsDirectory: URL(fileURLWithPath: "/tools/scripts"),
+            helpersScript: nil
+        ),
+        elfURL: URL(fileURLWithPath: "/tmp/DeviceTestApp.elf"),
+        target: target
+    )
+    #expect(args.contains("target/rp2350.cfg"))
+    #expect(args.contains(#"rtt setup 0x20000000 0x80000 "SEGGER RTT""#))
+}
+
 @Test func generatesPackageWithConcurrencyDependencyOnlyWhenRequested() throws {
     let metadata = DeviceTestMetadata(name: "Async", concurrency: true)
     let source = DeviceTestSource(
@@ -229,6 +277,25 @@ import Testing
     #expect(manifest.contains(".init(name: \"Variant_RP2040\")"))
     #expect(!manifest.contains(".init(name: \"Platform_RP2350\")"))
     #expect(!manifest.contains(".init(name: \"Variant_RP2350A\")"))
+}
+
+@Test func generatesPackageWithCYW43439RadioForPicoWTarget() throws {
+    let metadata = DeviceTestMetadata(name: "Sync", concurrency: false)
+    let source = DeviceTestSource(
+        fileURL: URL(fileURLWithPath: "/tmp/Sync.swift"),
+        source: "func syncTest() throws {}",
+        metadata: metadata,
+        functions: [DeviceTestFunction(name: "syncTest", isAsync: false, isThrowing: true)]
+    )
+
+    let manifest = DevicePackageGenerator.packageManifest(
+        for: source,
+        cpicoSDKPath: URL(fileURLWithPath: "/repo/CPicoSDK"),
+        target: .picoW
+    )
+    #expect(manifest.contains(".init(name: \"Platform_RP2040\")"))
+    #expect(manifest.contains(".init(name: \"Radio_CYW43439\")"))
+    #expect(!manifest.contains(".init(name: \"Radio_None\")"))
 }
 
 @Test func asyncFunctionsAutomaticallySelectConcurrency() throws {
