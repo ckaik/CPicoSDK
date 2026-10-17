@@ -91,6 +91,17 @@ let package = Package(
             name: "CShims",
             dependencies: [
                 // GENERATOR MARK: TARGET DEPENDENCIES
+            ],
+            cSettings: [
+                // C doesn't see traits. Forward the ones `pico.h` uses to pick the combination's
+                // compound header. The `.when(traits:)` dependencies above are OR-ed, so several
+                // compound headers are on the include path at once.
+                .define("Platform_RP2040", .when(traits: ["Platform_RP2040"])),
+                .define("Variant_RP2040", .when(traits: ["Variant_RP2040"])),
+                .define("Variant_RP2350A", .when(traits: ["Variant_RP2350A"])),
+                .define("Variant_RP2350B", .when(traits: ["Variant_RP2350B"])),
+                .define("Radio_None", .when(traits: ["Radio_None"])),
+                .define("Radio_CYW43439", .when(traits: ["Radio_CYW43439"])),
             ]
         ),
 
