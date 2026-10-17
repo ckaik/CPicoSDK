@@ -63,6 +63,7 @@ let package = Package(
     targets: hostOnlyTests ? [
         .target(name: "TestInDeviceCore"),
         .executableTarget(name: "MemoryMapReportTool"),
+        .executableTarget(name: "FlashGuardTool"),
         .testTarget(
             name: "TestInDeviceCoreTests",
             dependencies: ["TestInDeviceCore"]
@@ -70,6 +71,10 @@ let package = Package(
         .testTarget(
             name: "MemoryMapReportToolTests",
             dependencies: ["MemoryMapReportTool"]
+        ),
+        .testTarget(
+            name: "FlashGuardToolTests",
+            dependencies: ["FlashGuardTool"]
         ),
     ] : [
         // GENERATOR MARK: TARGETS
@@ -203,6 +208,7 @@ let package = Package(
             ]
         ),
         .executableTarget(name: "MemoryMapReportTool"),
+        .executableTarget(name: "FlashGuardTool"),
         .testTarget(
             name: "TestInDeviceCoreTests",
             dependencies: ["TestInDeviceCore"]
@@ -238,7 +244,7 @@ let package = Package(
                     .writeToPackageDirectory(reason: "Finalizes build by linking with pico-sdk and generates UF2 and ELF binaries."),
                 ]
             ),
-            dependencies: ["MemoryMapReportTool"]
+            dependencies: ["MemoryMapReportTool", "FlashGuardTool"]
         ),
         .plugin(
             name: "TestInDevicePlugin",
