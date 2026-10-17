@@ -17,6 +17,9 @@ void __no_inline_not_in_flash_func(cshims_mmio_clear_bits32)(volatile uint32_t *
     *addr = *addr & ~mask;
 }
 
+// QMI is RP2350-only. PSRAM, its only caller, doesn't call it on RP2040.
+#if PICO_RP2350
 uint32_t __no_inline_not_in_flash_func(cshims_qmi_direct_rx_read32)(void) {
     return qmi_hw->direct_rx;
 }
+#endif

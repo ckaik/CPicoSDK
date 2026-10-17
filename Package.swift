@@ -110,6 +110,17 @@ let package = Package(
                 .target(name: "_CPicoSDK_pico_w", condition: .when(traits: ["Platform_RP2040", "Variant_RP2040", "Radio_CYW43439"])),
                 .target(name: "_CPicoSDK_pimoroni_pico_plus2_rp2350", condition: .when(traits: ["Variant_RP2350B", "Radio_None"])),
                 .target(name: "_CPicoSDK_pimoroni_pico_plus2_w_rp2350", condition: .when(traits: ["Variant_RP2350B", "Radio_CYW43439"])),
+            ],
+            cSettings: [
+                // C doesn't see traits. Forward the ones `pico.h` uses to pick the combination's
+                // compound header. The `.when(traits:)` dependencies above are OR-ed, so several
+                // compound headers are on the include path at once.
+                .define("Platform_RP2040", .when(traits: ["Platform_RP2040"])),
+                .define("Variant_RP2040", .when(traits: ["Variant_RP2040"])),
+                .define("Variant_RP2350A", .when(traits: ["Variant_RP2350A"])),
+                .define("Variant_RP2350B", .when(traits: ["Variant_RP2350B"])),
+                .define("Radio_None", .when(traits: ["Radio_None"])),
+                .define("Radio_CYW43439", .when(traits: ["Radio_CYW43439"])),
             ]
         ),
 
