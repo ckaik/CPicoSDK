@@ -64,6 +64,10 @@ final class SchedulerSystem: @unchecked Sendable {
 #endif
     }
 
+    var isMulticoreStarted: Bool {
+        cshims_scheduler_is_multicore_started()
+    }
+
 #if CPUMetrics
     func cpuUsageEvents(for core: CPUCore) -> AsyncStream<CPUStats> {
         makeCPUUsageStream(core: core)

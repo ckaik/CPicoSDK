@@ -42,6 +42,7 @@ void cshims_scheduler_prepare_lock(void);
 int cshims_scheduler_poll_once(void);
 void cshims_scheduler_wait_for_work_forever(void);
 bool cshims_scheduler_start_multicore(void);
+bool cshims_scheduler_is_multicore_started(void);
 void cshims_scheduler_enqueue_deferred(void *item);
 void *cshims_scheduler_core1_stack_bottom(void);
 uint32_t cshims_scheduler_core1_stack_size_bytes(void);
