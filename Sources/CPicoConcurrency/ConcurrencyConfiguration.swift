@@ -37,4 +37,15 @@ public enum ConcurrencyRuntime {
     public static func startMulticore() {
         cshimsRuntimeScheduler.startMulticore()
     }
+
+    /// Whether `startMulticore()` has started core1 for the scheduler.
+    ///
+    /// Becomes true on the first successful `startMulticore()` call and stays
+    /// true. It stays false when core1 has no scheduler stack
+    /// (`CPICOSDK_CORE1_STACK_SIZE_BYTES=0`) or when `startMulticore()` was only
+    /// called from core1, because neither starts core1. Debug checks for
+    /// core0-only, single-core APIs can trap once this is true.
+    public static var isMulticoreStarted: Bool {
+        cshimsRuntimeScheduler.isMulticoreStarted
+    }
 }

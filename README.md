@@ -174,6 +174,10 @@ Only call `ConcurrencyRuntime.startMulticore()` when core1 belongs to the Swift
 concurrency scheduler. If you plan to use core1 for your own dedicated runtime,
 do not call it.
 
+`ConcurrencyRuntime.isMulticoreStarted` reports whether `startMulticore()` has
+started core1. It stays true once set, so libraries with core0-only APIs can use
+it to trap in debug builds once multicore is live.
+
 #### Scheduler Stack Sizes
 
 CPicoSDK sizes the scheduler stacks during finalization. The prepared

@@ -676,6 +676,14 @@ bool CSHIMS_SCHEDULER_LATE_FLASH cshims_scheduler_start_multicore(void) {
 #endif
 }
 
+bool CSHIMS_SCHEDULER_LATE_FLASH cshims_scheduler_is_multicore_started(void) {
+    // Callers poll this on every guarded entry point, so skip the scheduler lock.
+    // The latch only flips false -> true, a byte read is single-copy atomic, and
+    // a volatile read avoids the spinlock-backed __atomic_load_1 libcall on
+    // RP2040 while still re-reading memory on every call.
+    return *(volatile const bool *)&cshims_scheduler_multicore_enabled;
+}
+
 static SwiftExecutorRef cshims_generic_executor(void) {
     SwiftExecutorRef executor = {NULL, NULL};
     return executor;
