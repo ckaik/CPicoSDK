@@ -9,6 +9,7 @@ struct GenerateCPicoSDKPlugin: CommandPlugin {
         case cmakeConfigurationFailed
         case cmakeBuildFailed
         case markerNotFound(String)
+        case unknownCombination(String)
 
         var localizedDescription: String {
             switch self {
@@ -22,6 +23,8 @@ struct GenerateCPicoSDKPlugin: CommandPlugin {
                 return "CMake build failed."
             case .markerNotFound(let marker):
                 return "Marker not found: \(marker)"
+            case .unknownCombination(let combination):
+                return "Unknown combination: \(combination)"
             }
         }
     }
@@ -30,8 +33,9 @@ struct GenerateCPicoSDKPlugin: CommandPlugin {
 
     func performCommand(context: PackagePlugin.PluginContext, arguments: [String]) async throws {
         let env = try Env(from: context.package.directoryURL.appending(path: "env.json").relativePath)
-        
-        for combination in env.combinations.keys.sorted() {
+        let requestedCombinations = try requestedCombinations(arguments: arguments, env: env)
+
+        for combination in env.combinations.keys.sorted() where requestedCombinations.contains(combination) {
             print("[CPicoSDK] Generating CPicoSDK for combination: \(combination)")
             try await generateCPicoSDK(
                 combination: combination,
@@ -46,6 +50,23 @@ struct GenerateCPicoSDKPlugin: CommandPlugin {
             template: context.package.directoryURL.appending(path: "Package.swift.template"),
             destination: context.package.directoryURL.appending(path: "Package.swift")
         )
+    }
+
+    /// `--combination <name>` (repeatable) regenerates only those headers; without it, all of them.
+    /// Package.swift is always regenerated from every combination in env.json.
+    func requestedCombinations(arguments: [String], env: Env) throws -> Set<String> {
+        var extractor = ArgumentExtractor(arguments)
+        let requested = extractor.extractOption(named: "combination")
+
+        guard !requested.isEmpty else {
+            return Set(env.combinations.keys)
+        }
+
+        for combination in requested where env.combinations[combination] == nil {
+            throw Error.unknownCombination(combination)
+        }
+
+        return Set(requested)
     }
 
     func headerFileEligible(fileName: String) -> Bool {
@@ -158,6 +179,20 @@ struct GenerateCPicoSDKPlugin: CommandPlugin {
         #include <lwip/ip4_addr.h>
         """
 
+        // The BTstack libraries have no `<lib>/include` directory for the discovery below to find.
+        // Their compile definitions (ENABLE_BLE, CYW43_ENABLE_BLUETOOTH) and btstack_config.h reach
+        // the flattened header through the harness link graph.
+        let btstackInclude = !importedLibs.contains("pico_btstack_ble") ? "" : """
+        #include <btstack.h>
+        #include <btstack_tlv.h>
+        #include <ble/le_device_db_tlv.h>
+        #include <pico/btstack_cyw43.h>
+        #include <pico/btstack_run_loop_async_context.h>
+        #include <pico/btstack_flash_bank.h>
+        #include <pico/btstack_hci_transport_cyw43.h>
+        #include <pico/btstack_chipset_cyw43.h>
+        """
+
         let libIncludes = try importedLibs.compactMap { lib -> String in
             var includes = "\n// MARK: - \(lib) headers\n"
             
@@ -185,6 +220,7 @@ struct GenerateCPicoSDKPlugin: CommandPlugin {
         #include <pico/async_context_poll.h>
 
         \(lwipInclude)
+        \(btstackInclude)
         \(libIncludes)
         """
     }

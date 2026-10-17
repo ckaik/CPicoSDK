@@ -280,10 +280,20 @@ This matrix is temporary while we work on a more generic approach that ties trai
 | --- | --- | --- | --- | --- |
 | Pico | `pico` | `Platform_RP2040` | `Variant_RP2040` | `Radio_None` |
 | Pico W | `pico_w` | `Platform_RP2040` | `Variant_RP2040` | `Radio_CYW43439` |
+| Pico W with BLE | `pico_w_ble` | `Platform_RP2040` | `Variant_RP2040` | `Radio_CYW43439_BLE` |
 | Pico 2 | `pico2` | `Platform_RP2350` | `Variant_RP2350A` | `Radio_None` |
 | Pico 2 W | `pico2_w` | `Platform_RP2350` | `Variant_RP2350A` | `Radio_CYW43439` |
+| Pico 2 W with BLE | `pico2_w_ble` | `Platform_RP2350` | `Variant_RP2350A` | `Radio_CYW43439_BLE` |
 | Pimoroni Pico Plus 2 | `pimoroni_pico_plus2_rp2350` | `Platform_RP2350` | `Variant_RP2350B` | `Radio_None` |
 | Pimoroni Pico Plus 2 W | `pimoroni_pico_plus2_w_rp2350` | `Platform_RP2350` | `Variant_RP2350B` | `Radio_CYW43439` |
+
+Pick exactly one radio trait. `Radio_CYW43439_BLE` replaces `Radio_CYW43439` on a Pico W or Pico 2 W
+and gives you Wi-Fi and BLE: lwIP stays in, BTstack runs in poll mode on the CYW43 `async_context`,
+and `cyw43_arch_init()` starts it. CPicoSDK owns the BTstack configuration (`btstack_config.h` in
+both CMake harnesses), so apps can't change pool sizes or features. The Pimoroni Pico Plus 2 W
+(`Variant_RP2350B`) has no BLE combination. Enabling two radio traits at once, for example through
+trait union, is a compile error. When `Radio_CYW43439_BLE` is on, CPicoSDK also depends on the
+declaration-free `_CPicoSDK_BLE` module, so a dependent package can check `canImport(_CPicoSDK_BLE)`.
 
 ### Features & Capabilities
 
@@ -536,6 +546,8 @@ The script:
 4. Invokes the `PrepareEnvironmentPlugin` with flags to disable most side effects
 5. Sources the generated preparation script to export environment variables
 6. Calls the `GenerateCPicoSDKPlugin` to generate per-combination headers and targets
+
+To regenerate only some headers, pass `--combination <name>` (repeatable) to `generate-cpicosdk`. `Package.swift` is still regenerated from every combination in `env.json`. The generator doesn't reproduce hand-made annotations such as the `swift_attr("~Copyable")` on the RP2350 `xip_ctrl_hw_t` and `qmi_hw_t` structs, so re-apply them after regenerating.
 
 This separation allows the header generation to be version-controlled while keeping the environment setup flexible. 
 
@@ -1041,7 +1053,9 @@ connected target and will program and reset it.
 | `pico_w` | `pico_w` | `Radio_CYW43439` | Skipped |
 
 A test's `traits.add` entry with a `Platform_`, `Variant_` or `Radio_` trait
-replaces the target's default for that axis.
+replaces the target's default for that axis. A test that adds
+`Radio_CYW43439_BLE` builds the target's `_ble` combination (`pico_w_ble`,
+`pico2_w_ble`) and is skipped on targets without a CYW43439.
 
 The harness reuses a generated SwiftPM package per target in the plugin work
 directory and builds it against the local CPicoSDK checkout. In remote mode it

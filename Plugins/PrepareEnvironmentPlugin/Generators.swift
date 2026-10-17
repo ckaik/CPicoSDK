@@ -141,8 +141,11 @@ extension PrepareEnvironmentPlugin {
         for (name, combination) in packageEnv.combinations {
             print("[CPicoSDK] Specializing env vars for combination: \(name)")
             
+            // Don't override given vars, only globals. A given BOARD is the exception: it names the
+            // combination, while the combination's own BOARD names the Pico SDK board, and the two
+            // differ for the BLE combinations (`pico_w_ble` builds on the `pico_w` board).
             let combinationSpecializedVars = combination.vars
-                .filter { !givenEnvVars.keys.contains($0.key) } // Don't override given vars, only globals.
+                .filter { $0.key == "BOARD" || !givenEnvVars.keys.contains($0.key) }
             
             // Make sure overrides are resolved against globals + given.
             let resolvedCombinationSpecializedVars = self.resolve(

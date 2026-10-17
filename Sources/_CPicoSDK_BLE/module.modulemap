@@ -1,0 +1,4 @@
+module _CPicoSDK_BLE {
+    header "include/_CPicoSDK_BLE.h"
+    export *
+}
